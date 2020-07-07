@@ -36,6 +36,15 @@ var (
 	ErrCmd              = errors.New("Unknown command/target")
 	ErrTargetNoCommands = errors.New("No commands defined for a given target")
 	ErrConfigFile       = errors.New("Unknown ssh_config file")
+
+	supFileLocations = []string{
+		"./Supfile",
+		"./Supfile.yml",
+		"./Supfile.yaml",
+		"./.Supfile",
+		"~/.Supfile",
+		"/etc/sup/Supfile",
+	}
 )
 
 type flagStringSlice []string
@@ -221,6 +230,16 @@ func resolvePath(path string) string {
 	return path
 }
 
+func loadSupFile() ([]byte, error) {
+	for _, v := range append([]string{supfile}, supFileLocations...) {
+		data, err := ioutil.ReadFile(resolvePath(v))
+		if err == nil {
+			return data, nil
+		}
+	}
+	return nil, fmt.Errorf("could not load supfile in any of these location: %v", supFileLocations)
+}
+
 func main() {
 	flag.Parse()
 
@@ -235,19 +254,12 @@ func main() {
 		return
 	}
 
-	if supfile == "" {
-		supfile = "./Supfile"
-	}
-	data, err := ioutil.ReadFile(resolvePath(supfile))
+	data, err := loadSupFile()
 	if err != nil {
-		firstErr := err
-		data, err = ioutil.ReadFile("./Supfile.yml") // Alternative to ./Supfile.
-		if err != nil {
-			fmt.Fprintln(os.Stderr, firstErr)
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
-		}
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
+
 	conf, err := sup.NewSupfile(data)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
